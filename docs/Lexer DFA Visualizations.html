@@ -1,0 +1,674 @@
+
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Nova Lexer DFA Diagrams</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#1B3B63;
+    --ink:#EAF3FF;
+    --ink-dim:rgba(234,243,255,.64);
+    --ink-faint:rgba(234,243,255,.38);
+    --grid-line:rgba(234,243,255,.05);
+    --frame:rgba(234,243,255,.34);
+    --redline:#FF7A45;
+    --card:rgba(234,243,255,.05);
+    --row-alt:rgba(234,243,255,.04);
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0D1B2F; --ink:#E7F0FF; --ink-dim:rgba(231,240,255,.6);
+      --ink-faint:rgba(231,240,255,.34); --grid-line:rgba(231,240,255,.04);
+      --frame:rgba(231,240,255,.28); --redline:#FF8A5B; --card:rgba(231,240,255,.045);
+      --row-alt:rgba(231,240,255,.035);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0D1B2F; --ink:#E7F0FF; --ink-dim:rgba(231,240,255,.6);
+    --ink-faint:rgba(231,240,255,.34); --grid-line:rgba(231,240,255,.04);
+    --frame:rgba(231,240,255,.28); --redline:#FF8A5B; --card:rgba(231,240,255,.045);
+    --row-alt:rgba(231,240,255,.035);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:
+      repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
+      repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 28px),
+      var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .sheet{max-width:860px;margin:0 auto;padding-inline:20px;padding-block:36px 72px}
+  h1,h2,h3{text-wrap:balance}
+  p{line-height:1.62}
+  .lede{font-size:1.1rem;max-width:64ch}
+  p:not(.lede){max-width:66ch;color:var(--ink-dim)}
+  code{
+    font-family:var(--mono); background:var(--card); border:1px solid var(--frame);
+    border-radius:3px; padding:.05em .35em; font-size:.9em; color:var(--ink);
+  }
+  a{color:var(--redline);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  .titleblock{border:1px solid var(--frame);margin-bottom:32px}
+  .tb-row{display:flex;align-items:baseline;gap:12px;padding:14px 16px;border-bottom:1px solid var(--frame);flex-wrap:wrap}
+  .tb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .tb-grid>div{display:flex;flex-direction:column;gap:4px;padding:12px 16px;border-right:1px solid var(--frame)}
+  .tb-grid>div:last-child{border-right:none}
+  .tb-label{font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;color:var(--ink-faint)}
+  .tb-value{font-family:var(--mono);font-size:.84rem}
+
+  nav.toc{
+    border:1px solid var(--frame); background:var(--card);
+    padding:16px 18px; margin-bottom:48px;
+  }
+  nav.toc h2{
+    font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;
+    color:var(--ink-faint);margin:0 0 12px;
+  }
+  nav.toc ol{
+    margin:0;padding:0;list-style:none;
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 18px;
+  }
+  nav.toc li{font-family:var(--mono);font-size:.8rem}
+  nav.toc a{color:var(--ink-dim)}
+  nav.toc a:hover{color:var(--redline)}
+  nav.toc .n{color:var(--redline);margin-right:6px}
+
+  section.fam{
+    border-top:1px solid var(--frame);
+    padding-top:36px;margin-top:36px;
+    scroll-margin-top:20px;
+  }
+  section.fam h2{
+    font-family:var(--mono);font-size:.9rem;letter-spacing:.05em;
+    color:var(--redline);margin:0 0 4px;display:flex;gap:10px;align-items:baseline;
+  }
+  section.fam h2 .idx{color:var(--ink-faint);font-size:.8rem}
+  section.fam .pattern{
+    font-family:var(--mono);font-size:.82rem;color:var(--ink-dim);
+    margin:0 0 18px;
+  }
+  section.fam .pattern code{background:none;border:none;padding:0;color:var(--ink)}
+
+  .diagram{
+    border:1px solid var(--frame); background:var(--card);
+    padding:14px clamp(6px,3vw,20px); margin-bottom:16px; overflow-x:auto;
+  }
+  pre.mermaid{margin:0;background:transparent;font-family:var(--mono)}
+
+  table.ttable{
+    width:100%;border-collapse:collapse;
+    font-family:var(--mono);font-size:.78rem;
+    margin-bottom:14px;
+  }
+  table.ttable th{
+    text-align:left;font-size:.66rem;letter-spacing:.08em;
+    color:var(--ink-faint);border-bottom:1px solid var(--frame);
+    padding:7px 10px;
+  }
+  table.ttable td{
+    padding:7px 10px;border-bottom:1px solid var(--grid-line);
+    color:var(--ink-dim);
+  }
+  table.ttable tr:nth-child(even) td{background:var(--row-alt)}
+  table.ttable td.state{color:var(--ink);font-weight:600}
+  table.ttable td.dead{color:var(--ink-faint)}
+  table.ttable td.accept{color:var(--redline)}
+
+  section.fam .note{font-size:.86rem;color:var(--ink-dim);max-width:66ch;margin:0}
+
+  section.union{border-top:2px solid var(--redline);padding-top:36px;margin-top:48px}
+  section.union h2{
+    font-family:var(--mono);font-size:.85rem;letter-spacing:.08em;
+    color:var(--redline);margin:0 0 16px;
+  }
+
+  footer{
+    margin-top:56px;padding-top:20px;border-top:1px solid var(--frame);
+    font-family:var(--mono);font-size:.72rem;color:var(--ink-faint);
+  }
+
+  @media (max-width:520px){
+    .tb-grid>div{border-right:none;border-bottom:1px solid var(--frame)}
+    .tb-grid>div:last-child{border-bottom:none}
+    table.ttable{font-size:.72rem}
+  }
+</style>
+
+<div class="sheet">
+
+  <header class="titleblock">
+    <div class="tb-row">
+      <span class="tb-label">TITLE</span>
+      <span class="tb-value">NOVA LEXER — DFA DIAGRAMS</span>
+    </div>
+    <!--
+    <div class="tb-grid">
+      <div><span class="tb-label">DWG NO</span><span class="tb-value">CSE475&#8209;LEX&#8209;02</span></div>
+      <div><span class="tb-label">FAMILIES</span><span class="tb-value">15</span></div>
+      <div><span class="tb-label">STATES / CLASSES</span><span class="tb-value">40 / 29</span></div>
+      <div><span class="tb-label">SOURCE OF TRUTH</span><span class="tb-value">compiler/src/dfa.cpp</span></div>
+    </div>
+    -->
+  </header>
+
+  <p class="lede">Every token family the scanner recognizes, drawn on its own with its own state table. The last section shows how all 15 fit together into the one machine that actually runs.</p>
+
+  <nav class="toc" aria-label="Family index">
+    <h2>INDEX</h2>
+    <ol>
+      <li><a href="#f1"><span class="n">01</span>Whitespace</a></li>
+      <li><a href="#f2"><span class="n">02</span>Line comment</a></li>
+      <li><a href="#f3"><span class="n">03</span>Integer literal</a></li>
+      <li><a href="#f4"><span class="n">04</span>Identifier / keyword</a></li>
+      <li><a href="#f5"><span class="n">05</span>String literal + escape</a></li>
+      <li><a href="#f6"><span class="n">06</span>Dot / DotDot</a></li>
+      <li><a href="#f7"><span class="n">07</span>Minus / Arrow</a></li>
+      <li><a href="#f8"><span class="n">08</span>Equals / Eq / FatArrow</a></li>
+      <li><a href="#f9"><span class="n">09</span>Bang / NotEq</a></li>
+      <li><a href="#f10"><span class="n">10</span>Lt / LtEq</a></li>
+      <li><a href="#f11"><span class="n">11</span>Gt / GtEq</a></li>
+      <li><a href="#f12"><span class="n">12</span>Amp / AmpAmp</a></li>
+      <li><a href="#f13"><span class="n">13</span>Pipe / PipePipe</a></li>
+      <li><a href="#f14"><span class="n">14</span>One-shot punctuation</a></li>
+      <li><a href="#f15"><span class="n">15</span>End of input</a></li>
+      <li><a href="#union"><span class="n">★</span>Union / full machine</a></li>
+    </ol>
+  </nav>
+
+  <!-- 01 WHITESPACE -->
+  <section class="fam" id="f1">
+    <h2><span class="idx">01</span>Whitespace</h2>
+    <p class="pattern">pattern: <code>[ \t\r\n]+</code> — discarded, produces no token</p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "InWhitespace (SKIP)" as InWhitespace
+    [*] --> InWhitespace : WS/NL
+    InWhitespace --> InWhitespace : WS/NL
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>WHITESPACE, NEWLINE</td><td>InWhitespace</td><td class="dead">—</td></tr>
+      <tr><td class="state">InWhitespace</td><td>WHITESPACE, NEWLINE</td><td>InWhitespace (self)</td><td class="dead">—</td></tr>
+      <tr><td class="state">InWhitespace</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">SKIP</td></tr>
+    </table>
+    <p class="note">Anything besides whitespace or a newline from <code>InWhitespace</code> is dead, which is exactly what makes it accept <code>SKIP</code>. Only family that treats those two classes the same — comments (02) split them apart again.</p>
+  </section>
+
+  <!-- 02 COMMENT -->
+  <section class="fam" id="f2">
+    <h2><span class="idx">02</span>Line comment</h2>
+    <p class="pattern">pattern: <code>"//" [^\n]*</code> — discarded, produces no token</p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AfterSlash (Slash)" as AfterSlash
+    state "InLineComment (SKIP)" as InLineComment
+    [*] --> AfterSlash : SLASH
+    AfterSlash --> InLineComment : SLASH
+    AfterSlash --> [*] : else -&gt; accept Slash
+    InLineComment --> InLineComment : not NEWLINE/EOF
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>SLASH</td><td>AfterSlash</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterSlash</td><td>SLASH</td><td>InLineComment</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterSlash</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Slash</td></tr>
+      <tr><td class="state">InLineComment</td><td>everything but NEWLINE, EOF</td><td>InLineComment (self)</td><td class="dead">—</td></tr>
+      <tr><td class="state">InLineComment</td><td>NEWLINE, EOF</td><td class="dead">DEAD</td><td class="accept">SKIP</td></tr>
+    </table>
+    <p class="note">Hitting a newline or EOF while in <code>InLineComment</code> is dead too, same accept-<code>SKIP</code> deal. <code>AfterSlash</code> has to accept <em>Slash</em> by itself, since a lone <code>/</code> is just division — there's no way to know it's a comment until the next character shows up.</p>
+  </section>
+
+  <!-- 03 INT -->
+  <section class="fam" id="f3">
+    <h2><span class="idx">03</span>Integer literal</h2>
+    <p class="pattern">pattern: <code>[0-9]+</code></p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "InInt (IntLit)" as InInt
+    [*] --> InInt : DIGIT
+    InInt --> InInt : DIGIT
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>DIGIT</td><td>InInt</td><td class="dead">—</td></tr>
+      <tr><td class="state">InInt</td><td>DIGIT</td><td>InInt (self)</td><td class="dead">—</td></tr>
+      <tr><td class="state">InInt</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">IntLit</td></tr>
+    </table>
+    <p class="note">Anything that isn't a digit is dead, so it accepts <code>IntLit</code>. Simplest family by a wide margin — one state, one self-loop. No sign, no decimal point, no hex, matching how SPEC.md defines integers.</p>
+  </section>
+
+  <!-- 04 IDENT -->
+  <section class="fam" id="f4">
+    <h2><span class="idx">04</span>Identifier / keyword</h2>
+    <p class="pattern">pattern: <code>[A-Za-z_][A-Za-z0-9_]*</code></p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "InIdent (Ident)" as InIdent
+    [*] --> InIdent : ALPHA_
+    InIdent --> InIdent : ALPHA_/DIGIT
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>ALPHA_</td><td>InIdent</td><td class="dead">—</td></tr>
+      <tr><td class="state">InIdent</td><td>ALPHA_, DIGIT</td><td>InIdent (self)</td><td class="dead">—</td></tr>
+      <tr><td class="state">InIdent</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Ident</td></tr>
+    </table>
+    <p class="note">Same idea — anything that's not a letter, digit, or underscore is dead, and it accepts <code>Ident</code>. Keywords don't get their own states here; <code>fn</code> and <code>foo</code> look exactly the same to this diagram. The keyword check happens afterward, a plain lookup against a list once the identifier's already matched.</p>
+  </section>
+
+  <!-- 05 STRING -->
+  <section class="fam" id="f5">
+    <h2><span class="idx">05</span>String literal + escapes</h2>
+    <p class="pattern">pattern: <code>'"' ( '\' any | any-except-["\] )* '"'</code></p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "InString (not accepting)" as InString
+    state "InStringEscape (not accepting)" as InStringEscape
+    state "StringDone (StringLit)" as StringDone
+    [*] --> InString : QUOTE
+    InString --> InString : not QUOTE/BACKSLASH/EOF
+    InString --> InStringEscape : BACKSLASH
+    InStringEscape --> InString : any char, even QUOTE
+    InString --> StringDone : QUOTE (real close)
+    StringDone --> [*]
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>QUOTE</td><td>InString</td><td class="dead">—</td></tr>
+      <tr><td class="state">InString</td><td>everything but QUOTE, BACKSLASH, EOF</td><td>InString (self)</td><td class="dead">—</td></tr>
+      <tr><td class="state">InString</td><td>BACKSLASH</td><td>InStringEscape</td><td class="dead">—</td></tr>
+      <tr><td class="state">InStringEscape</td><td>everything but EOF</td><td>InString</td><td class="dead">—</td></tr>
+      <tr><td class="state">InString</td><td>QUOTE</td><td>StringDone</td><td class="accept">StringLit</td></tr>
+      <tr><td class="state">InString / InStringEscape</td><td>EOF</td><td class="dead">DEAD</td><td class="dead">none — unterminated string error</td></tr>
+    </table>
+    <p class="note">Hitting EOF while still in <code>InString</code> or <code>InStringEscape</code> is dead with nothing accepted, which triggers the unterminated-string error. Also the only family that stays non-accepting for two states in a row. <code>InStringEscape</code> sends everything back to <code>InString</code> no matter what character shows up, quote included — that's the whole reason <code>\"</code> doesn't close a string early.</p>
+  </section>
+
+  <!-- 06 DOT -->
+  <section class="fam" id="f6">
+    <h2><span class="idx">06</span>Dot / DotDot</h2>
+    <p class="pattern">pattern: <code>"." "."?</code></p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AfterDot (Dot)" as AfterDot
+    state "DotDotDone (DotDot)" as DotDotDone
+    [*] --> AfterDot : DOT
+    AfterDot --> DotDotDone : DOT
+    AfterDot --> [*] : else -&gt; accept Dot
+    DotDotDone --> [*] : else -&gt; accept DotDot
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>DOT</td><td>AfterDot</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterDot</td><td>DOT</td><td>DotDotDone</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterDot</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Dot</td></tr>
+      <tr><td class="state">DotDotDone</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">DotDot</td></tr>
+    </table>
+    <p class="note">Same shape shows up again in 08, 10, 11, 12, and 13 — an accepting state that still checks for one more character before it gives up on extending further.</p>
+  </section>
+
+  <!-- 07 MINUS -->
+  <section class="fam" id="f7">
+    <h2><span class="idx">07</span>Minus / Arrow</h2>
+    <p class="pattern">pattern: <code>"-" "&gt;"?</code></p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AfterMinus (Minus)" as AfterMinus
+    state "ArrowDone (Arrow)" as ArrowDone
+    [*] --> AfterMinus : MINUS
+    AfterMinus --> ArrowDone : GT
+    AfterMinus --> [*] : else -&gt; accept Minus
+    ArrowDone --> [*] : else -&gt; accept Arrow
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>MINUS</td><td>AfterMinus</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterMinus</td><td>GT</td><td>ArrowDone</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterMinus</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Minus</td></tr>
+      <tr><td class="state">ArrowDone</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Arrow</td></tr>
+    </table>
+  </section>
+
+  <!-- 08 EQUALS -->
+  <section class="fam" id="f8">
+    <h2><span class="idx">08</span>Equals / Eq / FatArrow</h2>
+    <p class="pattern">pattern: <code>"=" ("=" | "&gt;")?</code> — the one family with two possible extensions</p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AfterEquals (Assign)" as AfterEquals
+    state "EqDone (Eq)" as EqDone
+    state "FatArrowDone (FatArrow)" as FatArrowDone
+    [*] --> AfterEquals : EQUALS
+    AfterEquals --> EqDone : EQUALS
+    AfterEquals --> FatArrowDone : GT
+    AfterEquals --> [*] : else -&gt; accept Assign
+    EqDone --> [*] : else -&gt; accept Eq
+    FatArrowDone --> [*] : else -&gt; accept FatArrow
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>EQUALS</td><td>AfterEquals</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterEquals</td><td>EQUALS</td><td>EqDone</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterEquals</td><td>GT</td><td>FatArrowDone</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterEquals</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Assign</td></tr>
+      <tr><td class="state">EqDone</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Eq</td></tr>
+      <tr><td class="state">FatArrowDone</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">FatArrow</td></tr>
+    </table>
+    <p class="note">This is the only one where the accepting state forks into two different continuations instead of just one.</p>
+  </section>
+
+  <!-- 09 BANG -->
+  <section class="fam" id="f9">
+    <h2><span class="idx">09</span>Bang / NotEq</h2>
+    <p class="pattern">pattern: <code>"!="</code> only — bare <code>!</code> is not a Nova token</p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AfterBang (NOT accepting)" as AfterBang
+    state "NotEqDone (NotEq)" as NotEqDone
+    [*] --> AfterBang : BANG
+    AfterBang --> NotEqDone : EQUALS
+    AfterBang --> [*] : else -&gt; LEXICAL ERROR
+    NotEqDone --> [*] : else -&gt; accept NotEq
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>BANG</td><td>AfterBang</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterBang</td><td>EQUALS</td><td>NotEqDone</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterBang</td><td>everything else</td><td class="dead">DEAD</td><td class="dead">none — "unexpected character '!'"</td></tr>
+      <tr><td class="state">NotEqDone</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">NotEq</td></tr>
+    </table>
+    <p class="note"><code>AfterBang</code> is the only intermediate state in the whole table that's deliberately not accepting. Nova spells negation with the <code>not</code> keyword, so this state exists purely to let <code>!=</code> through and reject a bare <code>!</code> for anything else.</p>
+  </section>
+
+  <!-- 10 LT -->
+  <section class="fam" id="f10">
+    <h2><span class="idx">10</span>Lt / LtEq</h2>
+    <p class="pattern">pattern: <code>"&lt;" "="?</code></p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AfterLt (Lt)" as AfterLt
+    state "LtEqDone (LtEq)" as LtEqDone
+    [*] --> AfterLt : LT
+    AfterLt --> LtEqDone : EQUALS
+    AfterLt --> [*] : else -&gt; accept Lt
+    LtEqDone --> [*] : else -&gt; accept LtEq
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>LT</td><td>AfterLt</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterLt</td><td>EQUALS</td><td>LtEqDone</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterLt</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Lt</td></tr>
+      <tr><td class="state">LtEqDone</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">LtEq</td></tr>
+    </table>
+    <p class="note">Same family walked through step by step in the Scanner Blueprint page — <code>a &lt;= b</code> versus the backtrack case <code>a &lt; b</code>.</p>
+  </section>
+
+  <!-- 11 GT -->
+  <section class="fam" id="f11">
+    <h2><span class="idx">11</span>Gt / GtEq</h2>
+    <p class="pattern">pattern: <code>"&gt;" "="?</code> — mirror image of 10</p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AfterGt (Gt)" as AfterGt
+    state "GtEqDone (GtEq)" as GtEqDone
+    [*] --> AfterGt : GT
+    AfterGt --> GtEqDone : EQUALS
+    AfterGt --> [*] : else -&gt; accept Gt
+    GtEqDone --> [*] : else -&gt; accept GtEq
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>GT</td><td>AfterGt</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterGt</td><td>EQUALS</td><td>GtEqDone</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterGt</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Gt</td></tr>
+      <tr><td class="state">GtEqDone</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">GtEq</td></tr>
+    </table>
+  </section>
+
+  <!-- 12 AMP -->
+  <section class="fam" id="f12">
+    <h2><span class="idx">12</span>Amp / AmpAmp</h2>
+    <p class="pattern">pattern: <code>"&amp;" "&amp;"?</code></p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AfterAmp (Amp)" as AfterAmp
+    state "AmpAmpDone (AmpAmp)" as AmpAmpDone
+    [*] --> AfterAmp : AMP
+    AfterAmp --> AmpAmpDone : AMP
+    AfterAmp --> [*] : else -&gt; accept Amp
+    AmpAmpDone --> [*] : else -&gt; accept AmpAmp
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>AMP</td><td>AfterAmp</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterAmp</td><td>AMP</td><td>AmpAmpDone</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterAmp</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Amp</td></tr>
+      <tr><td class="state">AmpAmpDone</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">AmpAmp</td></tr>
+    </table>
+  </section>
+
+  <!-- 13 PIPE -->
+  <section class="fam" id="f13">
+    <h2><span class="idx">13</span>Pipe / PipePipe</h2>
+    <p class="pattern">pattern: <code>"|" "|"?</code> — mirror image of 12</p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AfterPipe (Pipe)" as AfterPipe
+    state "PipePipeDone (PipePipe)" as PipePipeDone
+    [*] --> AfterPipe : PIPE
+    AfterPipe --> PipePipeDone : PIPE
+    AfterPipe --> [*] : else -&gt; accept Pipe
+    PipePipeDone --> [*] : else -&gt; accept PipePipe
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>PIPE</td><td>AfterPipe</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterPipe</td><td>PIPE</td><td>PipePipeDone</td><td class="dead">—</td></tr>
+      <tr><td class="state">AfterPipe</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">Pipe</td></tr>
+      <tr><td class="state">PipePipeDone</td><td>everything else</td><td class="dead">DEAD</td><td class="accept">PipePipe</td></tr>
+    </table>
+  </section>
+
+  <!-- 14 PUNCT -->
+  <section class="fam" id="f14">
+    <h2><span class="idx">14</span>One-shot punctuation</h2>
+    <p class="pattern">pattern: one single fixed character, no possible continuation — 12 tokens, identical shape</p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AccX (Token X)" as AccX
+    [*] --> AccX : class for that one character
+    AccX --> [*] : terminal, no further input examined
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>character</th><th>class</th><th>state</th><th>accepts</th></tr>
+      <tr><td>(</td><td>LPAREN</td><td class="state">AccLParen</td><td class="accept">LParen</td></tr>
+      <tr><td>)</td><td>RPAREN</td><td class="state">AccRParen</td><td class="accept">RParen</td></tr>
+      <tr><td>{</td><td>LBRACE</td><td class="state">AccLBrace</td><td class="accept">LBrace</td></tr>
+      <tr><td>}</td><td>RBRACE</td><td class="state">AccRBrace</td><td class="accept">RBrace</td></tr>
+      <tr><td>[</td><td>LBRACKET</td><td class="state">AccLBracket</td><td class="accept">LBracket</td></tr>
+      <tr><td>]</td><td>RBRACKET</td><td class="state">AccRBracket</td><td class="accept">RBracket</td></tr>
+      <tr><td>,</td><td>COMMA</td><td class="state">AccComma</td><td class="accept">Comma</td></tr>
+      <tr><td>:</td><td>COLON</td><td class="state">AccColon</td><td class="accept">Colon</td></tr>
+      <tr><td>;</td><td>SEMICOLON</td><td class="state">AccSemi</td><td class="accept">Semicolon</td></tr>
+      <tr><td>+</td><td>PLUS</td><td class="state">AccPlus</td><td class="accept">Plus</td></tr>
+      <tr><td>*</td><td>STAR</td><td class="state">AccStar</td><td class="accept">Star</td></tr>
+      <tr><td>%</td><td>PERCENT</td><td class="state">AccPercent</td><td class="accept">Percent</td></tr>
+    </table>
+    <p class="note">All 12 of these go straight from <code>Start</code> and are dead everywhere else — Nova has no <code>+=</code>-style compound operators, so there's nothing left to extend into.</p>
+  </section>
+
+  <!-- 15 EOF -->
+  <section class="fam" id="f15">
+    <h2><span class="idx">15</span>End of input</h2>
+    <p class="pattern">the virtual "character" past the last byte of the source file</p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    state "AccEof (Eof)" as AccEof
+    [*] --> AccEof : EOF
+    AccEof --> [*] : terminal
+</pre>
+    </div>
+    <table class="ttable">
+      <tr><th>state</th><th>class</th><th>target</th><th>accepts</th></tr>
+      <tr><td class="state">Start</td><td>EOF</td><td>AccEof</td><td class="accept">Eof</td></tr>
+    </table>
+    <p class="note"><code>EOF</code> is the only class that never actually advances the read position — there's no character to consume, just the fact that input ran out.</p>
+  </section>
+
+  <!-- UNION -->
+  <section class="union" id="union">
+    <h2>★ UNION — ALL 15 FAMILIES SHARE ONE START</h2>
+    <p>Every diagram above starts at <code>Start</code>, so laying them all on top of each other at that one shared node is literally the whole machine — nothing extra added:</p>
+    <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    direction LR
+    [*] --> Start
+    Start --> InWhitespace : WS / NL
+    Start --> AfterSlash : SLASH
+    Start --> InInt : DIGIT
+    Start --> InIdent : ALPHA_
+    Start --> InString : QUOTE
+    Start --> AfterDot : DOT
+    Start --> AfterMinus : MINUS
+    Start --> AfterEquals : EQUALS
+    Start --> AfterBang : BANG
+    Start --> AfterLt : LT
+    Start --> AfterGt : GT
+    Start --> AfterAmp : AMP
+    Start --> AfterPipe : PIPE
+    Start --> AccPunct : punctuation
+    Start --> AccEof : EOF
+
+    InWhitespace --> [*] : SKIP (fam 01)
+    AfterSlash --> [*] : Slash / comment (fam 02)
+    InInt --> [*] : IntLit (fam 03)
+    InIdent --> [*] : Ident (fam 04)
+    InString --> [*] : StringLit (fam 05)
+    AfterDot --> [*] : Dot / DotDot (fam 06)
+    AfterMinus --> [*] : Minus / Arrow (fam 07)
+    AfterEquals --> [*] : Assign / Eq / FatArrow (fam 08)
+    AfterBang --> [*] : NotEq or error (fam 09)
+    AfterLt --> [*] : Lt / LtEq (fam 10)
+    AfterGt --> [*] : Gt / GtEq (fam 11)
+    AfterAmp --> [*] : Amp / AmpAmp (fam 12)
+    AfterPipe --> [*] : Pipe / PipePipe (fam 13)
+    AccPunct --> [*] : 12 tokens (fam 14)
+    AccEof --> [*] : Eof (fam 15)
+</pre>
+    </div>
+    <p>No two families use the same character class coming out of <code>Start</code>, so they all fit together with no conflicts. Expand each box here back into its full set of states and this is exactly the 40×29 table in <code>dfa_table.csv</code>, just drawn instead of dumped as text.</p>
+  </section>
+
+</div>
+
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+
+</body></html>

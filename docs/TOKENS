@@ -1,0 +1,43 @@
+Each token gets printed as `<class, value>`.
+
+Language Keywords
+-------------------------------------------------------------------------
+fn, let, mut, return, if, else, match, loop, break, continue, region, arr,
+free, extern, struct, enum, true, false, and, or, not, Option, Some, None,
+Result, Ok, Err. 
+
+These get lexed as plain identifiers first and then
+checked against a keyword list afterward.
+
+Identifiers and Literals
+-------------------------------------------------------------------------
+Identifiers are anything matching a letter/underscore followed by more
+letters/digits/underscores, as long as it's not one of the keywords above.
+
+Integer literals are just digits, nothing fancy — no sign, no decimals, no
+hex. Nova doesn't have floats so that's the only kind of number there is.
+
+String literals are double-quoted, with backslash escapes for newline, tab,
+carriage return, null, a literal quote, and a literal backslash. An escape
+it doesn't know just keeps the letter and drops the backslash. The quotes
+themselves get stripped off before the value is stored.
+
+Operators
+-------------------------------------------------------------------------
+Operators: `+ - * / % = == != < > <= >= & && | ||`. A lone `!` by itself
+isn't valid — negation is spelled `not`, `!` only shows up as half of `!=`.
+
+Punctuation: `( ) { } [ ] , : ; . .. -> =>`
+
+Comments, Whitespace, End of File markers
+-------------------------------------------------------------------------
+Comments start with `//` and run to the end of the line. They get
+recognized fine but don't produce a token, same as whitespace. 
+No block comments. 
+
+One `Eof` token at the very end, with nothing in it.
+
+Misc Tokens
+-------------------------------------------------------------------------
+Random symbols like `@` or `#`, non-ASCII bytes outside a string or
+comment, none of that is part of the language, so it just errors out.

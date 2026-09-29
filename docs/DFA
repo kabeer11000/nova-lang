@@ -1,0 +1,50 @@
+The scanner runs one loop over a transition table, 40 states by 29
+character classes. The table gets dumped straight from the running code
+with `novac --dump-dfa`, so the csv next to this file is exactly what the
+code does, not something retyped by hand.
+
+Every character gets sorted into a class first: digit, letter, quote,
+backslash, one class per operator character, EOF, and OTHER for anything
+that's not actually part of Nova. OTHER is why something like `@` just
+errors out.
+
+The states break down into a few groups: whitespace and comments (get
+skipped, produce no token), numbers, identifiers, strings, one pair of
+states for each two-character operator like `<`/`<=` or `=`/`==`/`=>`,
+one state per punctuation mark that can't turn into anything longer, and
+end of input.
+
+Scanning works the same way every time: look at the next character, look
+up the current state and that character's class in the table, move to
+wherever it points. If that lands on a state that counts as done, keep
+it in mind as the best match so far but don't stop, keep reading in case
+there's more. Once there's nowhere left to go, stop and report whatever
+was last remembered as done.
+
+That's also why something like `=` can turn into `==` or `=>` without
+writing any lookahead by hand — `AfterEquals` already accepts a plain
+`=`, but it also checks whether another `=` or a `>` shows up right
+after, and only falls back to the plain `=` if neither one does. The
+same idea covers `<`/`<=`, `>`/`>=`, `&`/`&&`, `|`/`||`, `.`/`..`, and
+`-`/`->`.
+
+There are two ways scanning can fail: a character with nowhere to go at
+all (a bad symbol, or a lone `!` since Nova only has `!=` and not a bare
+`!`), or reaching the end of the file while still inside a string that
+never got closed.
+
+Strings needed one extra state for escapes. A `"` normally ends a
+string, but hitting a `\` first sends the scanner into a state that just
+takes whatever character comes next no matter what it is, even another
+`"`, then goes back to reading the string normally. That's the whole
+reason `\"` doesn't close a string early. What the escape actually turns
+into, an actual newline for `\n` and so on, gets sorted out afterward,
+once the string has already been matched in full.
+
+Keywords work off the same identifier state rather than getting states
+of their own, since there's nothing different about the shape of `fn`
+compared to `foo`. The scanner just matches the identifier first and
+checks it against a short keyword list afterward, swapping the token
+type if it matches.
+
+Every state, class, and transition is laid out in full in dfa_table.csv.

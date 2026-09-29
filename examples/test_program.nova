@@ -1,0 +1,64 @@
+// test file for the scanner, tries to hit every token at least once and shocases language features for miss!?
+
+extern fn malloc(size: i64) -> i64
+
+struct Point { x: i32, y: i32 }
+
+enum Shape {
+    Circle(radius: i32),
+    Rect(w: i32, h: i32),
+}
+
+fn compare(a: i32, b: i32) -> bool {
+    let ok: bool = a == b and not (a != b)
+    let lo: bool = a <= b or b >= a
+    let both: bool = true && false
+    let either: bool = true | false
+    let both2: bool = true || false
+    return ok
+}
+
+fn find(a: arr<i32>, target: i32) -> Option<i32> {
+    loop i in 0..5 {
+        if a[i] == target { return Some(i) }
+    }
+    None
+}
+
+fn safe_div(a: i32, b: i32) -> Result<i32, str> {
+    if b == 0 { return Err("divide by zero") }
+    Ok(a / b)
+}
+
+fn main() {
+    let mut total: i64 = 0
+    let name: str = "nova"
+    let escaped: str = "line1\nline2\t\"quoted\"\\end"
+    let mut nums: [i32; 5] = [1, 2, 3, 4, 5]
+
+    loop i in 0..5 {
+        total = total + nums[i] * 2 - 1 / 2 % 3
+    }
+
+    region r {
+        let data = r.alloc_array<i32>(10)
+        let view = &data
+        let handle = &mut nums
+    }
+
+    match Shape.Circle(3) {
+        Shape.Circle(rad) => print(rad),
+        Shape.Rect(w, h)  => print(w),
+    }
+
+    let p = Point { x: 1, y: 2 }
+    print(p.x)
+
+    if compare(1, 2) { print(total) } else { print(0) }
+
+    loop {
+        break
+    }
+
+    free(nums)
+}

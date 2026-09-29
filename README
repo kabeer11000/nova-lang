@@ -1,0 +1,15 @@
+Lexer for the Nova Programming Language
+-------------------------------------------------------------------------
+More documentation in the `docs/` folder
+Build with:
+
+  g++ -std=c++20 -Isrc src/main.cpp src/lexer.cpp src/dfa.cpp -o novac.exe
+  ./novac.exe ./examples/test_program.nova
+
+Running it with no arguments just does a quick sanity check on a hardcoded
+snippet and prints how many tokens it found.
+
+Find token specification an keywords in TOKENS file
+
+Find the transition table writeup in DFA, the actual generated table in
+dfa_table.csv, and sample scanner output in sample_output.txt
