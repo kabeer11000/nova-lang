@@ -1,0 +1,846 @@
+ ▐▛███▛█   Claude Code v2.1.281
+▝▜██████▀  Opus 5.5 · Claude Team
+  ▝▝ ▝▝    E:\Software\cc
+
+
+❯ can you now make grammar for this                                             
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Write(docs\GRAMMAR)
+  ⎿  User rejected write to docs\GRAMMAR
+       1 Grammar for the Nova Programming Language
+       2 ----------------------------------------------------------------
+         ---------
+       3 This replaces the informal grammar in section 8 of ORIGINAL_SPEC
+         IFICATION.md.
+       4 It is written against the tokens the lexer actually produces (se
+         e TOKENS),
+       5 and shaped for a hand-written recursive descent parser: one func
+         tion per
+       6 rule, one token of lookahead, except for the few spots listed un
+         der
+       7 "Disambiguation" at the bottom.
+       8 
+       9 Notation (EBNF)
+      10 ----------------------------------------------------------------
+         ---------
+     … +193 lines
+
+● Write(docs\GRAMMAR_GUIDE.md)
+  ⎿  Wrote 173 lines to docs\GRAMMAR_GUIDE.md
+      1 # Writing the Nova grammar: a guide
+      2 
+      3 These notes cover what you need to write the grammar yourself. Th
+      4 you the grammar. The informal EBNF in section 8 of `ORIGINAL_SPEC
+        IFICATION.md`
+      5 is a starting point, but it has gaps. The sections below point th
+        em out.
+      7 ---
+      8 
+      9 ## 1. What the grammar is for
+     … +213 lines (ctrl+o to expand)
+  ⎿  PostToolUse:Write hook error
+  ⎿  Failed with non-blocking status code: bash: C:/Users/System: No such file 
+     or directory
+
+● I saved a guide to docs/GRAMMAR_GUIDE.md. It doesn't contain the grammar
+  itself, so that part is still yours to write.
+
+  The short version:
+
+  1. Terminals are your tokens. The grammar can only mention things your lexer
+     actually produces. i32, bool and Vec aren't keywords in your lexer, so they
+     come out as IDENT. _ is an IDENT too.
+  2. Recursive descent means one function per rule. At every choice point, the
+     parser has to pick a branch by looking at just the next token.
+     - Avoid left recursion: use expr = term { '+' term } rather than expr = 
+       expr '+' term.
+     - Factor out shared prefixes: a = X Y | X Z should become a = X ( Y | Z ).
+  3. Precedence comes from how you layer the rules. You write one rule per
+     precedence level, and each level calls only the level below it. Whatever
+     gets called last binds tightest.
+  4. Test it by hand. Walk through examples/test_program.nova one line at a
+     time. Any line that doesn't fit a rule shows you a gap.
+
+  Nova-specific problems you'll need to decide on (section 6 of the guide goes
+  through each one):
+  - No statement terminator: there's no ; and no newline token, so something
+    like print(x) followed by (a+b) on the next line is ambiguous.
+  - if x { ... } vs a struct literal: both start with IDENT '{'.
+  - r.alloc_array<i32>(10) vs p.x < y: after .name, a < could be either.
+  - & and |: each one does two different jobs.
+  - Keyword expressions: Some, None, Ok, Err and free need their own grammar
+    rules.
+  - Things the example program uses that section 8 of the spec doesn't cover:
+    extern fn, struct and array literals, assignment, labelled enum payloads,
+    qualified patterns, and trailing commas.
+  - Things the spec hasn't decided yet: unary minus, else if, and keeping both
+    and/&&.
+
+  When you have a draft, bring it back and I'll check it against the list in
+  section 7 of the guide.
+
+✻ Cooked for 3m 28s · done Tuesday 8:44 PM
+
+❯ can you psuh this folder to github                                            
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● User answered Claude's questions:
+  ⎿  · There's no GitHub remote yet. Create a new repo — what name and 
+     visibility? → nova-lang, public
+     · Include the build artifacts `novac.exe` (3.4 MB) and `Nova Lang.zip` (900
+     KB)? → include novac.exe
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● The project is now on GitHub as a public repo:
+  https://github.com/kabeer11000/nova-lang
+
+  - What's in it: one commit (397b681, "feat: add Nova lexer, DFA docs, and
+    grammar guide") with the source, docs, examples, CMakeLists.txt, README and
+    novac.exe. Your local main now tracks origin/main.
+  - Left out: Nova Lang.zip and the local .remember/ notes folder. I added both
+    to a new .gitignore.
+  - Worth checking: the commit also picked up a file called examples/....nova
+    that I hadn't noticed before. If it's a stray file, tell me and I'll remove
+    it.
+
+✻ Cogitated for 45s · done Tuesday 8:46 PM
+
+※ recap: You're building the Nova language compiler, and the grammar is next, which you're writing yourself using docs/GRAMMAR_GUIDE.md. The project is now public at github.com/kabeer11000/nova-lang; next, check whether the stray examples/....nova file should be removed. (disable recaps in /config)
+
+❯ idk anything about this code or lexers or tokenizers or anything can u        
+  explain this whole thing                                                      
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Here's the whole project, from the basic ideas up.
+
+  1. The big picture: what a compiler does
+
+  A computer can't run text like let x = 1 + 2 directly. A compiler translates
+  it into machine instructions, in stages, like an assembly line:
+
+  your code (text)
+     -> Lexer      splits the text into "words"          <- THIS PROJECT (done)
+     -> Parser     checks the words form valid sentences  <- next step (the 
+  grammar)
+     -> Checkers   types, memory safety, etc.
+     -> Codegen    produces machine code
+
+  Your project is stage 1 of a compiler for a made-up language called Nova. Nova
+  is described in docs/ORIGINAL_SPECIFICATION.md and looks a lot like Rust.
+
+  2. What a lexer (tokenizer) is
+
+  "Lexer", "tokenizer" and "scanner" all mean the same thing. It reads the raw
+  characters and groups them into tokens, the smallest meaningful pieces. It's
+  like splitting a sentence into words and labelling each one noun, verb, and so
+  on.
+
+  Input:
+  let x = 10 + y
+  Output:
+  <Let, let>
+  <Ident, x>
+  <Assign, =>
+  <IntLit, 10>
+  <Plus, +>
+  <Ident, y>
+  <Eof, >
+
+  Each token has a type (what kind of word it is) and text (the actual
+  characters). Spaces and comments are thrown away because they don't matter to
+  the later stages. docs/sample_output.txt shows real output of this for the
+  example program.
+
+  The lexer doesn't know whether the code makes sense. = = let 10 lexes fine.
+  Catching that is the parser's job, which is where the grammar comes in.
+
+  3. The files
+
+  ┌───────────────────────────────┬─────────────────────────────────────────┐
+  │             File              │               What it is                │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │                               │ The list of all token types (Fn, Ident, │
+  │ src/token.hpp                 │  Plus, ...) and the Token struct (type, │
+  │                               │  text, line, column)                    │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │                               │ The "brain": a table saying which       │
+  │ src/dfa.hpp / dfa.cpp         │ character leads to which state          │
+  │                               │ (explained below)                       │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │ src/lexer.hpp / lexer.cpp     │ The loop that walks through your code   │
+  │                               │ using that table and produces tokens    │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │ src/main.cpp                  │ Program entry: reads a file, runs the   │
+  │                               │ lexer, prints tokens                    │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │ examples/test_program.nova    │ A Nova program designed to use every    │
+  │                               │ token at least once                     │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │ docs/TOKENS                   │ Plain-English list of all the tokens    │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │ docs/DFA, dfa_table.csv, the  │ Explanation and pictures of the state   │
+  │ HTML file                     │ machine                                 │
+  ├───────────────────────────────┼─────────────────────────────────────────┤
+  │ novac.exe                     │ The compiled program                    │
+  └───────────────────────────────┴─────────────────────────────────────────┘
+
+  4. The key idea: a DFA (state machine)
+
+  DFA stands for Deterministic Finite Automaton. It sounds scary but it's just a
+  set of states plus rules like "if you're in state A and see character X, go
+  to state B."
+
+  Example: telling =, == and => apart.
+
+  Start --'='--> AfterEquals        (so far this is "=")
+  AfterEquals --'='--> EqDone       (it's "==")
+  AfterEquals --'>'--> FatArrowDone (it's "=>")
+  AfterEquals --anything else--> stop, it was just "="
+
+  Identifiers work the same way:
+  Start --letter--> InIdent
+  InIdent --letter or digit--> InIdent   (keep eating)
+  InIdent --anything else--> stop, it's an identifier
+
+  In the code, all these rules live in one big table, built in build_table() in
+  src/dfa.cpp:
+
+  table[current_state][character_type] = next_state   (or DEAD = nowhere to go)
+
+  To keep the table small, characters are first sorted into about 29 character 
+  classes by classify_char() in dfa.cpp. All digits count as Digit, all letters
+  and _ as Alpha, and so on. That way the table needs 29 columns instead of 256.
+  The full table is in docs/dfa_table.csv.
+
+  5. How the lexer loop works (src/lexer.cpp)
+
+  tokenize() repeats this until the end of the file:
+
+  1. scan_from(pos) starts at state Start and feeds characters one by one
+     through the table.
+  2. Each time it lands on an accepting state (one that forms a complete token,
+     like AfterEquals = "this is ="), it remembers it but keeps going.
+  3. When the table says DEAD, it stops and uses the last remembered match.
+
+     This is called maximal munch: always take the longest possible token. So ==
+     becomes one Eq token, not two Assigns, and count is one identifier, not c
+     + ount.
+  4. If nothing ever matched, you get an error. A stray @ gives "unexpected
+     character", and a " that's never closed gives "unterminated string
+     literal".
+  5. Post-processing:
+     - Whitespace and comments are marked Skip, so no token is produced.
+     - Keywords: the DFA doesn't know about keywords. fn and foo have the same
+       shape, so both come out as Ident. Afterwards the code looks the word up
+       in the keywords map; if it's there, like fn, the type is swapped to Fn.
+       That's much simpler than giving every keyword its own states.
+     - Strings: the quotes are stripped and escapes like \n are turned into real
+       newlines by unescape_string().
+  6. It records the line and column where each token started, for error messages
+     later.
+
+  6. main.cpp: running it
+
+  novac.exe examples/test_program.nova   -> prints every token
+  novac.exe --dump-dfa                   -> prints the DFA table as CSV
+  novac.exe                              -> runs a small built-in self-test
+
+  7. Nova-specific details worth knowing
+
+  - There's no ! on its own. Negation is written not, and ! only appears in !=,
+    so a lone ! is an error.
+  - Only whole numbers: no floats, hex or negative literals.
+  - Comments are // only. There are no /* */ block comments.
+  - i32, bool and str are not keywords. They lex as plain Ident, and later
+    stages work out that they're types.
+
+  8. Where the grammar fits (your next step)
+
+  The lexer gives you a flat list of words. The grammar is the set of rules for
+  which word orders are legal. For example, "a function is fn, then a name, then
+  (, then parameters, then ), then a block." The parser reads tokens following
+  those rules and builds a tree of the program. docs/GRAMMAR_GUIDE.md walks you
+  through writing it.
+
+  9. Two things an examiner might poke at
+
+  - 123abc is accepted as the number 123 followed by the identifier abc, with no
+    error. That's because the number state stops at the first letter. Most
+    languages would reject it.
+  - Error messages give the line but not the column, even though the column is
+    tracked.
+
+  If you'd like, I can save this explanation to a file, or trace one line of
+  test_program.nova through the table state by state so you can see it working.
+
+✻ Churned for 35s · done Tuesday 11:32 PM
+
+※ recap: You're building the lexer (first stage) of a compiler for Nova; it's pushed to GitHub, and I just explained how the lexer and its state machine work. Next, you write the grammar yourself using docs/GRAMMAR_GUIDE.md, and I'll review your draft. (disable recaps in /config)
+
+❯ why are some tokens kwok and kwsome so on not just Ok or Some                 
+
+● Most likely it's just a naming choice by whoever wrote the code, not something
+  the program needs. I can't know the author's reasoning for sure, but the code
+  itself shows the Kw prefix isn't required.
+
+  What Kw means: it's short for "keyword". KwOk means "the keyword Ok".
+
+  Why it isn't technically needed: the token types are declared as enum class 
+  TokenType in src/token.hpp. With enum class, every name has to be written with
+  its prefix, like TokenType::Ok, so it can't clash with anything else in the
+  program. Plain Ok, Some and None would compile fine.
+
+  Why someone might add it anyway:
+
+  1. To mark them as a separate group. Option, Some, None, Result, Ok and Err
+     look like ordinary type or value names in the language, but Nova makes them
+     keywords. The prefix reminds you of that.
+  2. To avoid confusion inside the compiler. Later stages of a compiler often
+     have their own Result, Option or Ok types, such as a parse result.
+     Something like TokenType::KwResult makes it clear you mean the Nova
+     keyword, not the compiler's own type.
+  3. To dodge None as a macro. Some C/C++ system headers, notably X11 on Linux,
+     define None as a macro. Macros ignore enum class scoping, so
+     TokenType::None can fail to compile there. That's a real risk, though only
+     for None.
+
+  The catch: it's applied inconsistently. True, False, Fn, Let and every other
+  keyword are keywords too, but they have no prefix. In a viva, the honest
+  answer is "it's a naming convention to separate the built-in Option/Result
+  names, and it also avoids the None macro issue." If you're asked why the other
+  keywords don't have it, "consistency wasn't enforced" is the truthful reply.
+
+  If you'd rather have it consistent, there are two fixes: rename these six to
+  Ok, Some and so on, keeping KwNone for the macro reason, or add Kw to every
+  keyword. It's a small change in token.hpp and lexer.cpp, plus regenerating the
+  sample output. Tell me if you want either, or leave it as is.
+
+✻ Baked for 18s · done 12:26 AM
+
+❯ so how is the whole lexer works like what table were we talking about class   
+  state table, so like if ur in a certain state and see certain class u go to   
+  next state? idk can u explain entire process im acc making a parallel lexer   
+  by hand using ur code as refernece,                                           
+
+● Yes, you've got it: if you're in a certain state and see a certain class, you 
+  go to the next state. The whole lexer is built on that one rule. Here's the
+  full process in the order your own version should do it.
+
+  The 3 lookup pieces
+
+  1. Character → class (classify_char in dfa.cpp)
+
+  Every character is first swapped for its "class":
+
+  'a'..'z', 'A'..'Z', '_'  -> Alpha
+  '0'..'9'                 -> Digit
+  ' ', '\t', '\r'          -> Whitespace
+  '\n'                     -> Newline
+  '='                      -> Equals
+  '<'                      -> Lt
+  ...one class per operator/punctuation character...
+  end of file              -> EndOfInput
+  anything else ('@', '#') -> Other
+
+  This way the table doesn't need a column for every one of the 256 possible
+  characters. It needs one column per class, 29 in total.
+
+  2. The transition table: (state, class) → next state (build_table in dfa.cpp)
+
+  It's a grid with 40 rows (states) and 29 columns (classes). Each cell says
+  where to go next, or DEAD if there's nowhere to go. Most cells are DEAD. A
+  small slice:
+
+  ┌───────────┬───────┬───────┬──────────┬───────────┬───────────┬─────────┐
+  │ state \   │ Alpha │ Digit │  Equals  │    Gt     │ Whitespac │ EndOfIn │
+  │   class   │       │       │          │           │     e     │   put   │
+  ├───────────┼───────┼───────┼──────────┼───────────┼───────────┼─────────┤
+  │ Start     │ InIde │ InInt │ AfterEqu │ AfterGt   │ InWhitesp │ AccEof  │
+  │           │ nt    │       │ als      │           │ ace       │         │
+  ├───────────┼───────┼───────┼──────────┼───────────┼───────────┼─────────┤
+  │ InIdent   │ InIde │ InIde │ DEAD     │ DEAD      │ DEAD      │ DEAD    │
+  │           │ nt    │ nt    │          │           │           │         │
+  ├───────────┼───────┼───────┼──────────┼───────────┼───────────┼─────────┤
+  │ InInt     │ DEAD  │ InInt │ DEAD     │ DEAD      │ DEAD      │ DEAD    │
+  ├───────────┼───────┼───────┼──────────┼───────────┼───────────┼─────────┤
+  │ AfterEqua │ DEAD  │ DEAD  │ EqDone   │ FatArrowD │ DEAD      │ DEAD    │
+  │ ls        │       │       │          │ one       │           │         │
+  ├───────────┼───────┼───────┼──────────┼───────────┼───────────┼─────────┤
+  │ EqDone    │ DEAD  │ DEAD  │ DEAD     │ DEAD      │ DEAD      │ DEAD    │
+  ├───────────┼───────┼───────┼──────────┼───────────┼───────────┼─────────┤
+  │ InWhitesp │ DEAD  │ DEAD  │ DEAD     │ DEAD      │ InWhitesp │ DEAD    │
+  │ ace       │       │       │          │           │ ace       │         │
+  └───────────┴───────┴───────┴──────────┴───────────┴───────────┴─────────┘
+
+  The full grid is docs/dfa_table.csv.
+
+  3. State → "is this a finished token?" (accepting_info in dfa.cpp)
+
+  Some states mean "what you've read so far is a complete token":
+
+  InIdent      -> Ident
+  InInt        -> IntLit
+  AfterEquals  -> Assign  (=)
+  EqDone       -> Eq      (==)
+  FatArrowDone -> FatArrow (=>)
+  InWhitespace -> Skip    (valid, but produce no token)
+  InString     -> not accepting (the string isn't closed yet)
+  AfterBang    -> not accepting (a lone ! isn't valid)
+
+  This is the last column (ACCEPTS) in the CSV.
+
+  The algorithm (scan_from + tokenize in lexer.cpp)
+
+  pos = 0
+  loop:
+      # --- scan ONE token starting at pos ---
+      state = Start
+      cursor = pos
+      best = none                       # last accepting state seen, and where
+
+      repeat:
+          cls  = classify(char at cursor)      # EndOfInput if past the end
+          next = table[state][cls]
+          if next == DEAD: stop
+          state = next
+          if not at end of file: cursor += 1
+          if state is accepting: best = (state, cursor)   # remember it, but 
+  KEEP GOING
+          if at end of file: stop
+
+      # --- decide what we got ---
+      if best == none: ERROR (bad character, or a string never closed)
+      lexeme = text[pos .. best.cursor]
+      pos = best.cursor                 # also update line/col while moving
+
+      if best is Skip: continue         # whitespace/comment, no token
+      if Ident and lexeme is in the keyword list: change the type to that 
+  keyword
+      if StringLit: strip the quotes, turn \n etc. into real characters
+      emit token(type, lexeme, line, col)
+      if Eof: done
+
+  The key detail is "remember the best match, but keep going." That's what makes
+  == come out as one token instead of two =. It's also why the lexer can fail
+  cleanly when it wanders into a non-accepting state like AfterBang.
+
+  Worked trace: let x==10
+
+  pos 0 (token 1)
+    Start        'l' Alpha      -> InIdent       accept Ident, best = "l"
+    InIdent      'e' Alpha      -> InIdent       best = "le"
+    InIdent      't' Alpha      -> InIdent       best = "let"
+    InIdent      ' ' Whitespace -> DEAD          stop
+    lexeme "let" is Ident -> in keyword list -> emit <Let, let>
+
+  pos 3 (token 2)
+    Start        ' ' Whitespace -> InWhitespace  accept Skip
+    InWhitespace 'x' Alpha      -> DEAD          stop -> Skip, no token
+
+  pos 4 (token 3)
+    Start        'x' Alpha      -> InIdent       best = "x"
+    InIdent      '=' Equals     -> DEAD          -> emit <Ident, x>
+
+  pos 5 (token 4)
+    Start        '=' Equals     -> AfterEquals   best = "="  (Assign)
+    AfterEquals  '=' Equals     -> EqDone        best = "==" (Eq)   <- longer 
+  match wins
+    EqDone       '1' Digit      -> DEAD          -> emit <Eq, ==>
+
+  pos 7 (token 5)
+    Start        '1' Digit      -> InInt         best = "1"
+    InInt        '0' Digit      -> InInt         best = "10"
+    InInt        EOF            -> DEAD          -> emit <IntLit, 10>
+
+  pos 9 (token 6)
+    Start        EOF            -> AccEof        -> emit <Eof, >, stop
+
+  Two failure cases:
+  - !x: Start ! goes to AfterBang, which isn't accepting. Then x hits DEAD.
+    Nothing was ever remembered as a match, so you get "unexpected character
+    '!'".
+  - "abc with no closing quote: the scanner stays in InString, which isn't
+    accepting, until the end of the file hits DEAD. Again there's no match, so
+    you get "unterminated string literal".
+
+  Building yours by hand: suggested order
+
+  1. The classifier (character → class). Test it on a few characters.
+  2. The table.
+     - Start with every cell set to DEAD, then fill in only the transitions you
+       need. The code does exactly this with its set(...) calls.
+     - Start small: whitespace, identifiers, integers and =/==. Add the rest
+       once those work.
+  3. The accepting-state list.
+  4. The scan loop with "remember best, keep going".
+  5. The outer loop: skip whitespace, keyword lookup, strings, Eof.
+  6. Check your output against docs/sample_output.txt by running both lexers on
+     examples/test_program.nova. If the outputs are identical, yours is right.
+
+  Drawing the states as circles and arrows first helps a lot. The HTML file in
+  docs/ has those diagrams if you want to copy the layout.
+
+✻ Worked for 37s · done 1:20 AM
+
+※ recap: You're building your own copy of the Nova lexer by hand, using this code as a reference, before writing the grammar yourself. Next, write the character classifier and a small transition table, then compare your output against docs/sample_output.txt. (disable recaps in /config)
+
+❯ how does one figure out these charclass, enum like is ist in dfa or smth      
+
+● Short answer: character classes aren't part of the DFA theory. They're a
+  shortcut you design yourself. You get them by asking one question: "which 
+  characters does the lexer always treat the same way?"
+
+  Theory vs. practice
+
+  In textbook DFA theory, the input alphabet is the individual characters. A
+  proper DFA table has a column for every character: a, b, c, ... 0, 1, ... =,
+  <, ...
+
+  That's about 256 columns, and most would be identical. The a column and the q
+  column say the same thing in every row: Start goes to InIdent, InIdent stays
+  in InIdent, everything else is DEAD.
+
+  So you merge columns that are identical in every row. Each merged group is a
+  "character class". It's purely a compression trick, and the DFA behaves
+  exactly the same either way.
+
+  How to work out the classes yourself
+
+  Step 1. List every token and the characters it uses (from docs/TOKENS):
+
+  identifier   letter or _ , then letters/digits/_
+  integer      digits
+  string       " ... "  with \ escapes
+  comment      // up to newline
+  operators    + - * / % = < > ! & | .
+  punctuation  ( ) { } [ ] , : ;
+  whitespace   space tab \r \n
+
+  Step 2. For each character, ask: "is there any state where this character 
+  behaves differently from some other character?" If yes, it needs its own
+  class. If no, it joins a group.
+
+  - All letters and _: they behave the same everywhere. Each one starts or
+    continues an identifier. That gives one class, Alpha.
+    - This only works because keywords are checked after the DFA. If the DFA had
+      to recognize fn itself, f and n would need their own classes, and the
+      table would explode.
+  - All digits: they start or continue an integer, and continue an identifier.
+    That's one class, Digit.
+  - Space, tab, \r: all just whitespace. One class, Whitespace.
+  - \n gets its own class, Newline, even though it's also whitespace. It ends a 
+    // comment, which spaces don't. That single difference in the InLineComment
+    row forces a separate class.
+  - " gets its own class, Quote: it starts and ends strings.
+  - \ gets its own class, Backslash: inside a string it starts an escape.
+  - Each operator character gets its own class: = behaves differently from < (=
+    can become == or =>, < can become <=), so they can't share a class. The same
+    goes for +, -, /, !, &, |, ., and so on.
+  - Each punctuation mark gets its own class: ( gives a different token than ),
+    so they must be separate.
+  - Everything left over (@, #, $, emoji bytes, ...) is never valid outside a
+    string or comment. It's one class, Other, which is always DEAD except inside
+    strings and comments.
+  - End of file isn't a real character, but the lexer needs to react to it (to
+    emit Eof, and to error on an unclosed string). It gets a class, EndOfInput.
+
+  That process gives you exactly the 29 classes in dfa.hpp.
+
+  Rule of thumb: start with everything in one bucket. Split a bucket whenever
+  you find two characters in it that need different arrows out of some state.
+
+  The states are worked out the same way
+
+  A state means "what have I read so far, and what could still come next?" Go
+  through each token and ask what you need to remember:
+
+  nothing read yet                        -> Start
+  read letters/digits (an identifier)     -> InIdent
+  read digits                             -> InInt
+  read "=" (could still become == or =>)  -> AfterEquals
+  read "=="                               -> EqDone
+  read "=>"                               -> FatArrowDone
+  inside a string                         -> InString
+  just saw \ inside a string              -> InStringEscape
+  read the closing "                      -> StringDone
+  read "/" (could become //)              -> AfterSlash
+  inside // comment                       -> InLineComment
+  read "("  (nothing can follow)          -> AccLParen
+  ...
+
+  Then, for each state, decide which classes lead where. That fills in the
+  table.
+
+  A test that shows why the classes matter
+
+  Suppose you later add hex numbers like 0x1F. Now x behaves differently from
+  other letters: after 0 it continues a number. So x has to be split out of
+  Alpha into its own class. The classes always follow from the token rules,
+  never the other way round.
+
+✻ Brewed for 30s · done 1:43 AM
+
+❯ can you tell me why classes are picked and what classes are picked            
+
+● There are 29 classes, listed in dfa.hpp. The why for each one is always the
+  same idea: it gets its own class because at least one state treats it 
+  differently from every other class. The table below lists each class, what's
+  in it, and the state that forces it to be separate.
+
+  Groups of characters
+
+  ┌────────────┬─────────────┬──────────────────────────────────────────────┐
+  │   Class    │ Characters  │                Why it exists                 │
+  ├────────────┼─────────────┼──────────────────────────────────────────────┤
+  │            │             │ Starts an identifier. All letters behave the │
+  │ Alpha      │ a-z A-Z _   │  same because keywords are checked after the │
+  │            │             │  DFA.                                        │
+  ├────────────┼─────────────┼──────────────────────────────────────────────┤
+  │            │             │ Starts an integer. Must be separate from     │
+  │ Digit      │ 0-9         │ Alpha because in Start a digit gives InInt   │
+  │            │             │ and a letter gives InIdent.                  │
+  ├────────────┼─────────────┼──────────────────────────────────────────────┤
+  │ Whitespace │ space, tab, │ Skipped.                                     │
+  │            │  \r         │                                              │
+  ├────────────┼─────────────┼──────────────────────────────────────────────┤
+  │            │             │ Also skipped, but it's the only character    │
+  │ Newline    │ \n          │ that ends a // comment (the InLineComment    │
+  │            │             │ row), so it can't share with Whitespace.     │
+  └────────────┴─────────────┴──────────────────────────────────────────────┘
+
+  String-related
+
+  ┌───────────┬────────────┬─────────────────────────────────────────────────┐
+  │   Class   │ Characters │                  Why it exists                  │
+  ├───────────┼────────────┼─────────────────────────────────────────────────┤
+  │ Quote     │ "          │ Starts a string in Start, ends it in InString.  │
+  ├───────────┼────────────┼─────────────────────────────────────────────────┤
+  │           │            │ In InString, it goes to InStringEscape instead  │
+  │ Backslash │ \          │ of staying in InString. Outside strings it's    │
+  │           │            │ invalid, but that one row is enough to need its │
+  │           │            │  own class.                                     │
+  └───────────┴────────────┴─────────────────────────────────────────────────┘
+
+  Operator characters
+
+  Each of these starts a different token, so each needs its own column in the
+  Start row. Some also matter as the second character of a two-character token.
+
+  ┌─────────┬──────┬─────────────────────┬────────────────────────────┐
+  │  Class  │ Char │ Tokens it's part of │ Also used as a 2nd char in │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Slash   │ /    │ /, //               │ // (comment)               │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Dot     │ .    │ ., ..               │ ..                         │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Minus   │ -    │ -, ->               │                            │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Equals  │ =    │ =, ==, =>           │ ==, !=, <=, >=             │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Bang    │ !    │ != only             │                            │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Lt      │ <    │ <, <=               │                            │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Gt      │ >    │ >, >=               │ ->, =>                     │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Amp     │ &    │ &, &&               │ &&                         │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Pipe    │ |    │ |, ||               │ ||                         │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Plus    │ +    │ +                   │                            │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Star    │ *    │ *                   │                            │
+  ├─────────┼──────┼─────────────────────┼────────────────────────────┤
+  │ Percent │ %    │ %                   │                            │
+  └─────────┴──────┴─────────────────────┴────────────────────────────┘
+
+  Plus, Star and Percent can never become longer tokens. They're still separate
+  classes because each one produces a different token: + gives Plus, * gives
+  Star.
+
+  Punctuation
+
+  LParen ( , RParen ), LBrace {, RBrace }, LBracket [, RBracket ], Comma ,,
+  Colon :, Semicolon ;
+
+  Each is a one-character token that can't grow. They're separate for the same
+  reason as Plus: each goes to a different accepting state from Start.
+
+  Special
+
+  ┌────────────┬────────────────────┬───────────────────────────────────────┐
+  │   Class    │        What        │             Why it exists             │
+  ├────────────┼────────────────────┼───────────────────────────────────────┤
+  │            │                    │ Start + EOF emits the Eof token.      │
+  │ EndOfInput │ end of file (not a │ Inside a string, EOF must not         │
+  │            │  real character)   │ continue the string, which is how     │
+  │            │                    │ "unterminated string" gets caught.    │
+  ├────────────┼────────────────────┼───────────────────────────────────────┤
+  │            │ everything else: @ │ Invalid in normal code (DEAD from     │
+  │ Other      │  # $ ~ ^ ?         │ Start), but allowed inside strings    │
+  │            │ backtick,          │ and comments. All of these behave the │
+  │            │ non-ASCII bytes    │  same, so they share one class.       │
+  └────────────┴────────────────────┴───────────────────────────────────────┘
+
+  The pattern behind all of it
+
+  A character gets its own class if any of these is true:
+  1. It starts a different token than other characters. That covers every
+     operator and punctuation mark, plus Alpha, Digit and Quote.
+  2. It's the second character of a two-character token (=, >, /, ., &, |).
+  3. It has a special meaning inside a string or comment (", \, \n, EOF).
+
+  If none of these applies, and the character behaves exactly like others in
+  every state, it gets merged: the letters into Alpha, the digits into Digit,
+  the junk into Other.
+
+  Quick self-check for your version: take any two classes and look at their
+  columns in docs/dfa_table.csv. If two columns are identical in every row,
+  those classes could be merged. In this lexer, no two columns are identical,
+  which means 29 is the minimum for these tokens.
+
+✻ Cogitated for 25s · done 2:05 AM
+
+※ recap: You're learning how the Nova lexer works so you can build your own version by hand, and we just went through the 29 character classes. Next, write your character classifier and a small starting table, then compare your output against docs/sample_output.txt. (disable recaps in /config)
+
+❯ why doesnt classify_char take char but takes an int                           
+● It takes an int so it can receive one extra value that isn't a character: "end
+  of file". The code uses -1 for that.
+
+  The problem with char
+
+  The lexer needs to hand classify_char two kinds of input:
+  - a real character from the source code
+  - "there are no more characters", which is end of file
+
+  A char holds exactly 256 values, and all 256 are possible real bytes in a
+  file. There's no spare value left over to mean "end of file".
+
+  An int holds far more values. Real bytes use 0 to 255, which leaves -1 free as
+  the EOF signal. The comment in src/dfa.hpp says the same:
+
+  // c is the byte as an unsigned char widened to int, or -1 for EOF
+  CharClass classify_char(int c);
+
+  And it's the first check in the function (src/dfa.cpp):
+
+  if (c == -1) return CharClass::EndOfInput;
+
+  This is the same trick C's own getchar() uses: it returns int so it can return
+  EOF (which is -1).
+
+  Why the unsigned char cast matters
+
+  Here's the call in scan_from (src/lexer.cpp):
+
+  int c = (cursor < src.size()) ? static_cast<unsigned char>(src[cursor]) : -1;
+
+  On most compilers, including yours on Windows, char is signed, meaning it
+  ranges from -128 to 127. Any byte of 128 or above becomes negative, and
+  non-ASCII text like é or emoji is made of such bytes.
+
+  - Without the cast, the byte 0xFF would become the int -1, and the lexer would
+    think the file had ended partway through.
+  - With the cast, it first becomes unsigned char 255, then int 255. Real bytes
+    always land in 0 to 255, so they can never collide with -1.
+
+  So the rule is:
+
+  real byte   -> 0..255   (via unsigned char)
+  end of file -> -1
+
+  For your version
+
+  If you write your own lexer you have two choices:
+  1. Do it the same way: take int, cast bytes through unsigned char, and use -1
+     for EOF.
+  2. Check for end of file before calling the classifier: if (pos >= size) cls =
+     EndOfInput; else cls = classify(src[pos]);. Then classify can take a char.
+
+     With this option you still need to handle signed char correctly. Your Other
+     fallback does that automatically, as long as you only compare against
+     specific characters like 'a' or '0'.
+
+  Either works. The code uses option 1 because it lets EOF go through the table
+  like any other class, with no special case in the loop.
+
+✻ Worked for 15s · done 2:12 AM
+
+❯ why are brackets RBracket so on diff classes                                  
+
+● Each bracket has to produce a different token, and in this design the only way
+  the lexer knows which token it found is which state it ended in.
+
+  Walk through it
+
+  The parser later needs to tell ( from ), because one opens a group and the
+  other closes it. So they must become different tokens: LParen and RParen.
+
+  In this lexer, the token type comes from the final state, via accepting_info:
+
+  AccLParen -> LParen
+  AccRParen -> RParen
+
+  To end in different states, the characters must take different arrows out of 
+  Start:
+
+  Start --'('--> AccLParen
+  Start --')'--> AccRParen
+
+  The table picks the arrow by looking up table[Start][class]. If ( and ) were
+  in the same class, say Bracket, there would be only one cell,
+  table[Start][Bracket], and it can only point to one state. Both would end in
+  the same place and become the same token. The parser couldn't tell them apart.
+
+  So different token means a different end state, which means a different class.
+  The same goes for { } [ ] , : ;.
+
+  Couldn't they be merged?
+
+  Yes, if you're willing to do the work somewhere else. An alternative design:
+
+  class Punct = ( ) { } [ ] , : ; + * %
+  Start --Punct--> AccPunct
+
+  Then, after the DFA finishes, you'd look at the actual character to decide the
+  token:
+
+  if lexeme == "(" -> LParen
+  if lexeme == ")" -> RParen
+  ...
+
+  This is exactly how keywords are handled: every word goes through InIdent and
+  a lookup afterwards decides fn vs let vs a plain identifier.
+
+  The tradeoff:
+
+  ┌─────────────────────┬──────────────────────────┬───────────────────────┐
+  │                     │    Separate classes      │ One Punct class plus  │
+  │                     │        (current)         │       a lookup        │
+  ├─────────────────────┼──────────────────────────┼───────────────────────┤
+  │ Table size          │ 29 columns, 40 states    │ ~20 columns, ~30      │
+  │                     │                          │ states                │
+  ├─────────────────────┼──────────────────────────┼───────────────────────┤
+  │ Where the token is  │ 100% in the table        │ Table plus a lookup   │
+  │ decided             │                          │ afterwards            │
+  ├─────────────────────┼──────────────────────────┼───────────────────────┤
+  │ Consistency         │ The table alone          │ Split across two      │
+  │                     │ describes the lexer      │ places                │
+  └─────────────────────┴──────────────────────────┴───────────────────────┘
+
+  The current code keeps punctuation and operators fully in the table, so
+  dfa_table.csv completely describes them. It only uses the "lookup afterwards"
+  trick for keywords, where putting them in the table would mean dozens of extra
+  states.
+
+  For your hand-built version either choice is fine. If you pick the merged
+  option, make sure the lookup covers every punctuation character.
+
+✻ Churned for 13s · done 2:29 AM
+
+※ recap: You're learning how the Nova lexer works so you can build your own version by hand, and we just covered why each bracket and punctuation mark gets its own character class. Next, write your character classifier and test it on a few characters.
